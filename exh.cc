@@ -4,17 +4,20 @@
 #include <fstream>
 #include <cassert>
 #include <vector>
+#include <map>
 using namespace std;
 
 
 struct Player {
     string name;
-    string position;
     int price;
-    string club;
     int points;
 };
+
 using VP = vector<Player>;
+using VVP = vector<VP>;
+
+using VS = vector<string>;
 
 
 // Used to define the restrictions
@@ -32,40 +35,45 @@ struct Restrictions {
 
 // Used to define our current team
 struct Team {
-    // N0: current goalkeepers
-    // N1: current defenders
-    // N2: current midfielders
-    // N3: current attackers
     // T: current cost
     // P: current points
-    // players: vector with players used
-    int N0, N1, N2, N3, T, P;
-    VP players;
+    // names: vector with the names of the players
+    int T, P;
+    VS names;
+};
+
+
+const unordered_map<string, int> POSITION_TRANSLATOR = {
+    {"por", 0},
+    {"def", 1},
+    {"mig", 2},
+    {"dav", 3},
 };
 
 
 // Reads data file containing players, saves all players into "players" as long as their price
 // is less than or equal to the limit per player given
-void read_players(const string& data_file, VP& all_players, int limit){
+void read_players(const string& data_file, VVP& all_players, int limit){
     ifstream input(data_file);
+    string bin; char cbin;
+    string position;
     while (not input.eof()) {
         Player player;
-        auto& [name, position, price, club, points] = player;
+        auto& [name, price, points] = player;
         getline(input, name, ';');    if (name == "") break;
         getline(input, position, ';');
         input >> price;
-        char aux; input >> aux;
-        getline(input, club, ';');
+        input >> cbin;
+        getline(input, bin, ';');
         input >> points;
-        string aux2;
-        getline(input, aux2);
-        if (price <= limit) all_players.push_back(player);
+        getline(input, bin);
+        if (price <= limit) all_players[POSITION_TRANSLATOR.at(position)].push_back(player);
     }
     input.close();
 }
 
 
-void read_input(int argc, char** argv, Restrictions& restrictions, VP& all_players){
+void read_input(int argc, char** argv, Restrictions& restrictions, VVP& all_players){
     if (argc != 4) {
         cout << "Incorrect Syntax" << endl;
         cout << "    Syntax:  " << argv[0] << " <data_file> <input_file> <output_file>" << endl;
@@ -81,67 +89,70 @@ void read_input(int argc, char** argv, Restrictions& restrictions, VP& all_playe
 }
 
 
-void add_player(Team& team, const Player& player, int index, bool remove){
-    
-    int multiplier;
-    if (remove) {
-        multiplier = -1;
-        team.players[index] = player;
-    }
-    else {
-        multiplier = 1;
-    }
+int get_position(const Team& team, const Restrictions& restrictions, int current_player){
+    if (current_player >= restrictions.N2 + restrictions.N1 + restrictions.N0) return 3;
+    if (current_player >= restrictions.N1 + restrictions.N0) return 2;
+    if (current_player >= restrictions.N0) return 1;
+    if (current_player == 0) return 0;
 
-    team.P += player.points * multiplier;
-    team.T += player.price * multiplier;
-    if (player.position == "por") team.N0 += multiplier;
-    else if (player.position == "def") team.N1 += multiplier;
-    else if (player.position == "mig") team.N2 += multiplier;
-    else if (player.position == "dav") team.N3 += multiplier;
-    else throw invalid_argument("invalid position");
+    throw invalid_argument("invalid current_player");
 }
 
 
-bool is_team_valid(const Team& team, const Restrictions& restrictions, int current_players, int max_points){
+// Resets previous player index if needed
+void reset_previous_player_index(const Restrictions& restrictions, int& previous_player_index, int current_players){
+    if ((current_players == 0) or
+        (current_players == restrictions.N0) or
+        (current_players == restrictions.N0 + restrictions.N1) or
+        (current_players == restrictions.N0 + restrictions.N1 + restrictions.N2)
+    )
+        previous_player_index = -1;
+}
+
+
+void add_player(Team& team, const Player& player, int index, bool remove){
+    
+    int multiplier = (remove ? -1 : 1);
+    team.P += player.points * multiplier;
+    team.T += player.price * multiplier;
+    team.names[index] = player.name;
+}
+
+
+bool is_team_valid(const Team& team, const Restrictions& restrictions, const VVP& all_players, int max_points,
+                   int position, int current_player_index, int current_players){
     return (
-        (team.N0 <= restrictions.N0) and
-        (team.N1 <= restrictions.N1) and
-        (team.N2 <= restrictions.N2) and
-        (team.N3 <= restrictions.N3) and
         (team.T <= restrictions.T) and 
         ((team.P + (11 - current_players) * restrictions.J) > max_points)
     );
 }
 
 
-void write_team(const Team& team, const string& outputFile){
+void write_team(const Team& team, const Restrictions& restrictions, const string& outputFile){
     /*
     finishTime = std::clock();
     duration = ( std::clock() - start ) / (double) CLOCKS_PER_SEC;
     */
-    Player POR;
-    vector<Player> DEF;
-    vector<Player> MIG;
-    vector<Player> DAV;
-    for(Player J : team.players){
-        if (J.position == "por") POR = J;
-        else if(J.position == "def") DEF.push_back(J);
-        else if(J.position == "mig") MIG.push_back(J);
-        else if(J.position == "dav") DAV.push_back(J);
-    }
-
     ofstream File;
     File.open(outputFile);
 
+    int base = 0;
+    File << "POR: " << team.names[base];
+    for (int i = base + 1; i < restrictions.N0; ++i) File << ';' << team.names[i]; File << endl;
+    base += restrictions.N0;
 
-    File << "POR: " << POR.name << endl;
-    File << "DEF: ";
-    for(Player J : DEF) File << J.name << ";";
-    File << endl << "MIG:";
-    for(Player J : MIG) File << J.name << ";";
-    File << endl << "DAV:";
-    for(Player J : DAV) File << J.name << ";";
-    File << endl;
+    File << "DEF: " << team.names[base];
+    for (int i = base + 1; i < base + restrictions.N1; ++i) File << ';' << team.names[i]; File << endl;
+    base += restrictions.N1;
+
+    File << "MIG: " << team.names[base];
+    for (int i = base + 1; i < base + restrictions.N2; ++i) File << ';' << team.names[i]; File << endl;
+    base += restrictions.N2;
+
+    File << "DAV: " << team.names[base];
+    for (int i = base + 1; i < base + restrictions.N3; ++i) File << ';' << team.names[i]; File << endl;
+    base += restrictions.N3;
+
     File << "Punts: " << team.P << endl;
     File << "Preu: " << team.T << endl;
 
@@ -149,36 +160,39 @@ void write_team(const Team& team, const string& outputFile){
 }
 
 
-void search(Team& team, const Restrictions& restrictions, const VP& all_players, const string& output_file, 
+void search(Team& team, const Restrictions& restrictions, const VVP& all_players, const string& output_file, 
             int& max_points, int previous_player_index, int current_players){
     
     cout << current_players << endl;
     if (current_players == 11){
         if (team.P > max_points) {
-            write_team(team, output_file);
+            write_team(team, restrictions, output_file);
             max_points = team.P;
         }
         return;
     }
-    for (int i = previous_player_index + 1; i < (int) all_players.size(); ++i) {
-        add_player(team, all_players[i], current_players, false);
-        if (is_team_valid(team, restrictions, current_players + 1, max_points)){
+    int position = get_position(team, restrictions, current_players);
+    reset_previous_player_index(restrictions, previous_player_index, current_players);
+
+    for (int i = previous_player_index + 1; i < (int) all_players[position].size(); ++i){
+        add_player(team, all_players[position][i], current_players, false);
+        if (is_team_valid(team, restrictions, all_players, max_points, position, i, current_players + 1)){
             search(team, restrictions, all_players, output_file, max_points, i, current_players + 1);
         }
-        add_player(team, all_players[i], current_players, true);
+        add_player(team, all_players[position][i], current_players, true);
     }
 }
 
 
 int main(int argc, char** argv) {
-
     Restrictions restrictions;
-    VP all_players;
+    VVP all_players(4);
     read_input(argc, argv, restrictions, all_players);
     const string output_file = argv[3];
+    for (VP aa : all_players) cout << aa.size() << endl;
 
-    Team team = {0, 0, 0, 0, 0, 0, VP(11)};
-    
+    Team team = {0, 0, VS(11)};
+
     int max_points = 0;
     search(team, restrictions, all_players, output_file, max_points, -1, 0);
 }
