@@ -31,6 +31,12 @@
 *.out
 *.app
 
+*.tar
+
+.DS_Store
 .vscode
 test.txt
 output.txt
+
+test.cc
+public_benchs_results*
