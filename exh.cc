@@ -108,11 +108,9 @@ void add_player(Team& team, const Player& player, int position, int index, bool 
 }
 
 
-bool is_team_valid(const Team& team, const Restrictions& restrictions, int max_points,
-                   int position, int current_players){
+bool is_team_valid(const Team& team, const Restrictions& restrictions){
     return (
-        (team.T <= restrictions.T) and 
-        ((team.P + (11 - current_players) * restrictions.J) > max_points)
+        (team.T <= restrictions.T)
     );
 }
 
@@ -151,7 +149,7 @@ void search(Team& team, const Restrictions& restrictions, const VVP& all_players
          (i < (int) options) and (options - i >= restrictions.limits[position] - players_in_position);
          ++i){
         add_player(team, all_players[position][i], position, players_in_position, false);
-        if (is_team_valid(team, restrictions, max_points, position, players_in_position + 1)){
+        if (is_team_valid(team, restrictions)){
             search(team, restrictions, all_players, output_file, start, max_points, position, i, players_in_position + 1);
         }
         add_player(team, all_players[position][i], position, players_in_position, true);
