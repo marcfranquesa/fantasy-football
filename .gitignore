@@ -38,5 +38,6 @@
 test.txt
 output.txt
 
-test.cc
+test*
 public_benchs_results*
+*results
