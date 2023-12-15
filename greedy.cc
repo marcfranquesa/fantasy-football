@@ -9,6 +9,8 @@
 #include <cmath>
 using namespace std;
 
+using VI = vector<int>;
+
 
 struct Player {
     string name;
@@ -19,8 +21,6 @@ struct Player {
 
 using VP = vector<Player>;
 using VVP = vector<VP>;
-
-using VI = vector<int>;
 
 
 // Used to define the restrictions
@@ -51,20 +51,20 @@ double time(){
     return clock() / CLOCKS_PER_SEC;
 }
 
-const double c1 = 4;
-const double c2 = 1;
+
 bool comp(const Player& a, const Player& b) {
-    return (pow(a.points, c1) / pow(a.price, c2)) > (pow(b.points, c1) / pow(b.price, c2));
+    double c1 = 4;
+    double c2 = 1;
+    return  (pow(b.points, c1) / pow(b.price, c2)) < (pow(a.points, c1) / pow(a.price, c2));
 }
 
 
-// Reads data file containing players, saves all players into "players" as long as their price
+// Reads data file containing players, saves all players into "all_players" as long as their price
 // is less than or equal to the limit per player given
 void read_players(const string& data_file, VP& all_players, const int& limit){
     ifstream input(data_file);
     string bin; char cbin;
     string position_name;
-    int position;
     while (not input.eof()) {
         Player player;
         auto& [name, price, points, position] = player;
@@ -112,11 +112,12 @@ void add_player(Team& team, const Player& player, int& index){
     team.P += player.points;
     team.T += player.price;
     team.players[player.position][index] = player;
-    index += 1;
+    ++index;
 }
 
 
-void write_team(const Team& team, const Restrictions& restrictions, const string& outputFile, const double& start){
+void write_team(const Team& team, const Restrictions& restrictions,
+                const string& outputFile, const double& start){
     ofstream File;
     File.open(outputFile);
     File << fixed << setprecision(1) << time() - start << endl;
@@ -134,7 +135,7 @@ void write_team(const Team& team, const Restrictions& restrictions, const string
 }
 
 
-void greedy(const Restrictions& restrictions, VP& all_players,
+void greedy(const Restrictions& restrictions, const VP& all_players,
             const string& output_file, const double& start){
     // all_players already sorted
 
@@ -145,16 +146,18 @@ void greedy(const Restrictions& restrictions, VP& all_players,
         VP(restrictions.limits[2]),
         VP(restrictions.limits[3])
     };
+
     Team team;
     team = {0, 0, players};
 
-    vector<int> size_pos = {0,0,0,0};
+    VI size_pos = {0, 0, 0, 0};
 
-    for (uint i = 0; i < all_players.size(); i++){
-        Player& p = all_players[i];
+    // Fills team with first possible players after sorting
+    for (int i = 0; i < (int) all_players.size(); ++i){
+        const Player& p = all_players[i];
         if(team.T + p.price <= restrictions.T and (restrictions.limits[p.position] > size_pos[p.position])){
             add_player(team, p, size_pos[p.position]);
-        }  
+        }
     }
 
     write_team(team, restrictions, output_file, start);

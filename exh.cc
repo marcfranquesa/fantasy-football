@@ -8,6 +8,8 @@
 #include <ctime>
 using namespace std;
 
+using VI = vector<int>;
+
 
 struct Player {
     string name;
@@ -17,8 +19,6 @@ struct Player {
 
 using VP = vector<Player>;
 using VVP = vector<VP>;
-
-using VI = vector<int>;
 
 
 // Used to define the restrictions
@@ -55,7 +55,7 @@ bool comp(const Player& a, const Player& b) {
 }
 
 
-// Reads data file containing players, saves all players into "players" as long as their price
+// Reads data file containing players, saves all players into "all_players" as long as their price
 // is less than or equal to the limit per player given
 void read_players(const string& data_file, VVP& all_players, const int& limit){
     ifstream input(data_file);
@@ -114,27 +114,29 @@ void add_player(Team& team, const Player& player, const int& position, const int
 
 
 bool is_team_valid(const Team& team, const Restrictions& restrictions, const VVP& all_players,
-                   const Team& best_team, const int& position, const int& player_index, const int& players_in_position){
-    int theo_max = team.P;
+                   const Team& best_team, const int& position, const int& player_index,
+                   const int& players_in_position){
+    int theoretical_max = team.P;
     for (int i = players_in_position + 1; i < restrictions.limits[position]; ++i){
-        theo_max += all_players[position][player_index + i - players_in_position].points;
+        theoretical_max += all_players[position][player_index + i - players_in_position].points;
     }
     for (int i = position + 1; i < 4; ++i) for (int j = 0; j < restrictions.limits[i]; ++j){
-        theo_max += all_players[i][j].points;
+        theoretical_max += all_players[i][j].points;
     }
 
     return (
-        (theo_max > best_team.P) and
-        (team.T <= restrictions.T) and
-        not (
-            best_team.players[position][players_in_position].points > team.players[position][players_in_position].points and 
-            best_team.players[position][players_in_position].price < team.players[position][players_in_position].price
-        )
+        (theoretical_max > best_team.P) and
+        (team.T <= restrictions.T) // and
+        // not (
+        //     best_team.players[position][players_in_position].points > team.players[position][players_in_position].points and 
+        //     best_team.players[position][players_in_position].price < team.players[position][players_in_position].price
+        // )
     );
 }
 
 
-void write_team(const Team& team, const Restrictions& restrictions, const string& outputFile, const double& start){
+void write_team(const Team& team, const Restrictions& restrictions,
+                const string& outputFile, const double& start){
     ofstream File;
     File.open(outputFile);
     File << fixed << setprecision(1) << time() - start << endl;

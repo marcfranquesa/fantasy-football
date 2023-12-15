@@ -11,6 +11,8 @@
 #include <cstdlib>
 using namespace std;
 
+using VI = vector<int>;
+
 
 struct Player {
     string name;
@@ -21,8 +23,6 @@ struct Player {
 
 using VP = vector<Player>;
 using VVP = vector<VP>;
-
-using VI = vector<int>;
 
 
 // Used to define the restrictions
@@ -54,14 +54,14 @@ double time(){
 }
 
 
-const double c1 = 4;
-const double c2 = 1;
 bool comp(const Player& a, const Player& b) {
+    const double c1 = 4;
+    const double c2 = 1;
     return (pow(a.points, c1) / pow(a.price, c2)) > (pow(b.points, c1) / pow(b.price, c2));
 }
 
 
-// Reads data file containing players, saves all players into "players" as long as their price
+// Reads data file containing players, saves all players into "all_players" as long as their price
 // is less than or equal to the limit per player given
 void read_players(const string& data_file, VP& all_players, const int& limit){
     ifstream input(data_file);
@@ -139,7 +139,7 @@ void write_team(const Team& team, const Restrictions& restrictions, const string
 
 
 // to select a random player uniformly in the CL with position pos
-Player select_random_player(VP& candidate_list, const int& alpha){
+Player select_random_player(VP& candidate_list, int& alpha){
     Player p;
     int rnd = rand() % alpha;
     p = candidate_list[rnd];
@@ -179,7 +179,7 @@ Team greedy_radomized_team(const VP& all_players, const Restrictions& restrictio
         }  
     }
 
-    if(!full(team, restrictions)){
+    if (not full(team, restrictions)){
         // add fake players to team
     }
 
