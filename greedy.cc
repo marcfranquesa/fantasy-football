@@ -52,11 +52,24 @@ double time(){
 }
 
 
-bool comp(const Player& a, const Player& b) {
-    double c1 = 4;
-    double c2 = 1;
-    return  (pow(b.points, c1) / pow(b.price, c2)) < (pow(a.points, c1) / pow(a.price, c2));
-}
+// Defined as a class to be able to initialise it with parameters
+class comp {
+    double c1, c2;
+    int remaining_money, total_budget, max_points;
+    public:
+        comp(double c1, double c2, int remaining_money, int total_budget, int max_points)
+            : c1(c1), c2(c2), remaining_money(remaining_money), total_budget(total_budget), max_points(max_points){}
+
+        double value(const Player& p) const {
+            return pow(p.points, c1) * pow((remaining_money - p.price), c2);
+        }
+
+        bool operator()(const Player& p1, const Player& p2) const {
+            if (p1.points == 0 and not (p2.points == 0)) return true;
+            if (p2.points == 0 and not (p1.points == 0)) return false;
+            return value(p1) < value(p2);
+        }
+};
 
 
 // Reads data file containing players, saves all players into "all_players" as long as their price
@@ -85,8 +98,6 @@ void read_players(const string& data_file, VP& all_players, const int& limit){
         }
     }
     input.close();
-
-    sort(all_players.begin(), all_players.end(), comp);
 }
 
 
@@ -135,9 +146,8 @@ void write_team(const Team& team, const Restrictions& restrictions,
 }
 
 
-void greedy(const Restrictions& restrictions, const VP& all_players,
+void greedy(const Restrictions& restrictions, VP& all_players,
             const string& output_file, const double& start){
-    // all_players already sorted
 
     // Initialising empty team
     VVP players = {
@@ -147,17 +157,37 @@ void greedy(const Restrictions& restrictions, const VP& all_players,
         VP(restrictions.limits[3])
     };
 
-    Team team;
-    team = {0, 0, players};
-
+    Team team = {0, 0, players};
     VI size_pos = {0, 0, 0, 0};
+    Player p;
 
-    // Fills team with first possible players after sorting
-    for (int i = 0; i < (int) all_players.size(); ++i){
-        const Player& p = all_players[i];
-        if(team.T + p.price <= restrictions.T and (restrictions.limits[p.position] > size_pos[p.position])){
-            add_player(team, p, size_pos[p.position]);
-        }
+    // Parameters used to sort the players
+    double c1 = 1.5, c2 = 2;
+    
+    // While team is not full, we sort the players and add the first
+    // player that satisfies the restrictions, at each iteration
+    // the parameters are changed
+    for (int total_players = 0; total_players < 11; ++total_players) {
+        // Sorts players in increasing order, check comp class
+        // for exact sorting criteria
+        sort(
+            all_players.begin(),
+            all_players.end(),
+            comp(c1, c2, restrictions.T - team.T, restrictions.T, restrictions.J)
+        );
+
+        // Finds first possible player, until found, removes
+        // players that are not usable
+        do {
+            p = all_players[all_players.size() - 1];
+            all_players.pop_back();
+        } while (
+            (team.T + p.price > restrictions.T) or
+            not (restrictions.limits[p.position] > size_pos[p.position])
+        );
+
+        add_player(team, p, size_pos[p.position]);
+        c1 *= 1.15;
     }
 
     write_team(team, restrictions, output_file, start);
