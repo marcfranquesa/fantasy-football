@@ -7,6 +7,8 @@
 #include <vector>
 #include <ctime>
 #include <cmath>
+#include <random>
+#include <cstdlib>
 using namespace std;
 
 
@@ -50,6 +52,7 @@ struct Team {
 double time(){
     return clock() / CLOCKS_PER_SEC;
 }
+
 
 const double c1 = 4;
 const double c2 = 1;
@@ -134,9 +137,29 @@ void write_team(const Team& team, const Restrictions& restrictions, const string
 }
 
 
-void greedy(const Restrictions& restrictions, VP& all_players,
-            const string& output_file, const double& start){
-    // all_players already sorted
+
+// to select a random player uniformly in the CL with position pos
+Player select_random_player(VP& candidate_list, const int& alpha){
+    Player p;
+    int rnd = rand() % alpha;
+    p = candidate_list[rnd];
+    // delete rnd player from the candidate list
+    alpha = alpha - 1;
+    return p;
+}
+
+bool full(const vector<int>& size_pos, const Restrictions& restrictions){
+    for(int k = 0; k < 4; k++){
+        if(size_pos[k] != restrictions[k]){
+            return false;
+        }
+    }
+    return true;
+}   
+
+
+// generates a random_team
+Team greedy_radomized_team(const VP& all_players, const Restrictions& restrictions, const int& alpha){
 
     // Initialising empty team
     VVP players = {
@@ -147,17 +170,43 @@ void greedy(const Restrictions& restrictions, VP& all_players,
     };
     Team team;
     team = {0, 0, players};
-
     vector<int> size_pos = {0,0,0,0};
 
-    for (uint i = 0; i < all_players.size(); i++){
-        Player& p = all_players[i];
+    while(alpha > 0 and !full(team, restrictions)){
+        Player& p = select_random_player(all_players, alpha);
         if(team.T + p.price <= restrictions.T and (restrictions.limits[p.position] > size_pos[p.position])){
             add_player(team, p, size_pos[p.position]);
         }  
     }
 
-    write_team(team, restrictions, output_file, start);
+    if(!full(team, restrictions)){
+        // add fake players to team
+    }
+
+    return team;
+}
+
+
+// find the best team around team
+// searching players that fit the team that increases the team's points
+Team local_search(Team team, const VVP& all_players, const Restrictions& restrictions){
+
+}
+
+
+void metaheuristic(const Restrictions& restrictions, VVP& all_players,
+            const string& output_file, const double& start){
+    Team team, best_team;
+    vector<int> alpha;
+
+    best_team = greedy_randomized_team(all_players, restrictions, alpha);
+    while true{
+        team = local_search(best_team, all_players, restrictions);
+
+        if (team.P > best_team.P) best_team = team;
+    }
+
+    write_team(best_team, restrictions, output_file, start);
 }
 
 
@@ -165,9 +214,9 @@ int main(int argc, char** argv) {
 
     double start = time();
     Restrictions restrictions;
-    VP all_players;
+    VVP all_players;
     read_input(argc, argv, restrictions, all_players);
     const string output_file = argv[3];
 
-    greedy(restrictions, all_players, output_file, start);
+    metaheuristic(restrictions, all_players, output_file, start);
 }
