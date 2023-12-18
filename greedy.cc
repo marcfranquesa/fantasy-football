@@ -162,7 +162,7 @@ void greedy(const Restrictions& restrictions, VP& all_players,
     Player p;
 
     // Parameters used to sort the players
-    double c1 = 1.5, c2 = 2;
+    double c1 = 1, c2 = 1.5;
     
     // While team is not full, we sort the players and add the first
     // player that satisfies the restrictions, at each iteration
@@ -187,7 +187,7 @@ void greedy(const Restrictions& restrictions, VP& all_players,
         );
 
         add_player(team, p, size_pos[p.position]);
-        c1 *= 1.15;
+        c1 *= (total_players + 12)/11;
     }
 
     write_team(team, restrictions, output_file, start);
