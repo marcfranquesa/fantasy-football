@@ -221,6 +221,11 @@ Team find_random_neighbour(Team team, const VP& all_players, const Restrictions&
     return team;
 }
 
+double Boltzman_probability(const int& punts1, const int& punts2, const int& T){
+    return exp(static_cast<double>(punts1 - punts2) / T);
+}
+
+
 // find the best team around team
 // searching players that fit the team that increases the team's points
 Team local_search(const Team& team, const VP& all_players, const Restrictions& restrictions){
@@ -228,8 +233,10 @@ Team local_search(const Team& team, const VP& all_players, const Restrictions& r
     Team local_best = team;
     Team actual = team;
     int k = 0;
+    int T = 1e8;
+    const double a = 0.99;
     // trobo una alineació veí, si és millor l'escullo, sino, amb probabilitat 1-p l'escullo
-    while (k < 5000){
+    while (k < 10000){
         
         Team t = find_random_neighbour(actual, all_players, restrictions);
 
@@ -245,13 +252,15 @@ Team local_search(const Team& team, const VP& all_players, const Restrictions& r
             // escullo un canvi que empitjora amb probabilitat inv. proporcional a l'empitjorament que aquest té
             // Com mes empitjora el random neighour, menys possibilitats d'escollir-lo
             // Generar un número aleatorio real entre 0 y 100
-            int rnd = rand() % 100;
-            double coef = static_cast<double>(t.P) / actual.P;
-            if (rnd < 20 * coef){
+            double random = static_cast<double>(rand()) / RAND_MAX;
+            double prob = Boltzman_probability(t.P, actual.P, T);
+            if (random <= prob){
                 actual = t;
             }
             k++;
+            T *= a;
         }
+        
     }
     
     return local_best;
@@ -266,7 +275,7 @@ void metaheuristic(const Restrictions& restrictions, VP& all_players,
     best_team.P = 0;
     int k = 0;
 
-    while(k < 100){
+    while(k < 50){
         rand_team = greedy_randomized_team(all_players, restrictions, alpha);
         team = local_search(rand_team, all_players, restrictions);
 
