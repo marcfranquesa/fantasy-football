@@ -130,6 +130,7 @@ void add_player(Team& team, const Player& player, int& index){
 }
 
 
+
 void write_team(const Team& team, const Restrictions& restrictions, const string& outputFile, const double& start){
     ofstream File;
     File.open(outputFile);
@@ -150,16 +151,15 @@ void write_team(const Team& team, const Restrictions& restrictions, const string
 
 
 // to select a random player uniformly in the CL with position pos
-Player select_random_player(VP& candidate_list, const int& alpha){
-    Player p;
-    int rnd = rand() % alpha;
-    p = candidate_list[rnd];
+Player select_random_player(VP& candidate_list){
 
-    return p;
+    int rnd = rand() % candidate_list.size();
+
+    return candidate_list[rnd];
 }
 
 // generates a random_team
-Team greedy_radomized_team(const VP& all_players, const Restrictions& restrictions, const int& alpha){
+Team greedy_randomized_team(const VP& all_players, const Restrictions& restrictions, const int& alpha){
 
     // Initialising empty team
     VVP players = {
@@ -172,22 +172,23 @@ Team greedy_radomized_team(const VP& all_players, const Restrictions& restrictio
     team = {0, 0, players};
     vector<int> size_pos = {0,0,0,0};
 
-    while ((size_pos[0]+size_pos[1]+size_pos[2]+size_pos[3]) < 11){
+    while (size_pos[1] != restrictions.limits[1] or size_pos[2]!= restrictions.limits[2] or size_pos[3] != restrictions.limits[3] or size_pos[0] != 1){
         // creem candidate list de mida alpha de jugadors que hi càpiguen al equip
-        int k = 0, j = 0;
+        int k = 0;
+        int j = 0;
         VP CL;
         while (k < alpha and j < all_players.size()){
             // just to make sure that we have a CL even though we don't have >= alpha avaliable players we add the last constriction
             Player p = all_players[j];
-            if(p.price + team.T <= restrictions.T and p.price < restrictions.J and size_pos[p.position] < restrictions.limits[p.position] and
+            if(p.price + team.T <= restrictions.T and p.price <= restrictions.J and size_pos[p.position] < restrictions.limits[p.position] and
             !team.isOnTeam(p.name)){
-                CL.push_back(p)
+                CL.push_back(p);
                 k++;
             }  
             j++;
         }
 
-        Player p = select_random_player(CL, CL.size());
+        Player p = select_random_player(CL);
         add_player(team, p, size_pos[p.position]);
     }
 
@@ -195,47 +196,61 @@ Team greedy_radomized_team(const VP& all_players, const Restrictions& restrictio
 }
 
 
-Team find_random_neighbour(const Team& team, const VP& all_players, const Restrictions& restrictions){
-    
-    while true{
-        Player p = all_players[randInt(all_players.size()-1)];
-        if(!team.isOnTeam(p)){
+Team find_random_neighbour(Team team, const VP& all_players, const Restrictions& restrictions){
+
+    int found = 0;
+    while (found == 0){
+        int index_rnd = rand() % all_players.size();
+        Player p = all_players[index_rnd];
+        if(!team.isOnTeam(p.name)){
             //exchange it with a player in team with same position
-            // as team is sorted, 
-            int index_deleted;
-            add_player(team, p, index_deleted);
+            
+            int index_deleted = rand() % restrictions.limits[p.position];
+            Player p_deleted = team.players[p.position][index_deleted];
+            if(team.T + p.price - p_deleted.price < restrictions.T){
+                team.T -= p_deleted.price;
+                team.P -= p_deleted.points;
+
+                add_player(team, p, index_deleted);
+                
+                found = 1;
+            }
         }
     }
 
+    return team;
 }
 
 // find the best team around team
 // searching players that fit the team that increases the team's points
-Team local_search(const Team& team, const VVP& all_players, const Restrictions& restrictions){
+Team local_search(const Team& team, const VP& all_players, const Restrictions& restrictions){
     
     Team local_best = team;
+    Team actual = team;
+    int k = 0;
     // trobo una alineació veí, si és millor l'escullo, sino, amb probabilitat 1-p l'escullo
-    while true{
-        Team actual = team;
+    while (k < 5000){
+        
         Team t = find_random_neighbour(actual, all_players, restrictions);
 
         if (t.P > actual.P){
             actual = t;
 
-            if (t.P > local_best){
+            if (t.P > local_best.P){
                 local_best = t;
+                k = 0;
             }
         }
         else{
             // escullo un canvi que empitjora amb probabilitat inv. proporcional a l'empitjorament que aquest té
             // Com mes empitjora el random neighour, menys possibilitats d'escollir-lo
-            // Generar un número aleatorio real entre 0 y 1
-            uniform_real_distribution<double> dis(0.0, 1.0);
-            double rnd = dis(gen);
-
-            if (rnd < 0.1 * t.P/actual.P){
+            // Generar un número aleatorio real entre 0 y 100
+            int rnd = rand() % 100;
+            double coef = static_cast<double>(t.P) / actual.P;
+            if (rnd < 20 * coef){
                 actual = t;
             }
+            k++;
         }
     }
     
@@ -244,19 +259,21 @@ Team local_search(const Team& team, const VVP& all_players, const Restrictions& 
 }
 
 
-void metaheuristic(const Restrictions& restrictions, VVP& all_players,
+void metaheuristic(const Restrictions& restrictions, VP& all_players,
             const string& output_file, const double& start){
-    Team team1, team2, best_team;
-    vector<int> alpha;
+    Team team, rand_team, best_team;
+    int alpha = 4;
     best_team.P = 0;
+    int k = 0;
 
-    while true{
-        ran_team = greedy_randomized_team(all_players, restrictions, alpha);
-        team = local_search(ran_team, all_players, restrictions);
+    while(k < 100){
+        rand_team = greedy_randomized_team(all_players, restrictions, alpha);
+        team = local_search(rand_team, all_players, restrictions);
 
-        if (team.P > best_team.P) best_team = team;
+        if (team.P >= best_team.P) best_team = team;
+
+        k++;
     }
-
     write_team(best_team, restrictions, output_file, start);
 }
 
@@ -265,7 +282,7 @@ int main(int argc, char** argv) {
 
     double start = time();
     Restrictions restrictions;
-    VVP all_players;
+    VP all_players;
     read_input(argc, argv, restrictions, all_players);
     const string output_file = argv[3];
 

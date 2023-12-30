@@ -1,7 +1,7 @@
 CC=g++
 CFLAGS=-Wall -O3 -std=c++17
 
-all: exh greedy parser checker
+all: exh greedy mh parser checker
 test: test_exh test_greedy test_mh
 
 exh: exh.cc
