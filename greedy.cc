@@ -55,12 +55,15 @@ double time(){
 // Defined as a class to be able to initialise it with parameters
 class comp {
     double c1, c2;
-    int remaining_money, total_budget, max_points;
+    int remaining_money, total_budget, max_cost;
+    bool last;
     public:
-        comp(double c1, double c2, int remaining_money, int total_budget, int max_points)
-            : c1(c1), c2(c2), remaining_money(remaining_money), total_budget(total_budget), max_points(max_points){}
+        comp(double c1, double c2, int remaining_money, int total_budget, int max_points, bool last)
+            : c1(c1), c2(c2), remaining_money(remaining_money), total_budget(total_budget),
+            max_cost(max_cost), last(last){}
 
         double value(const Player& p) const {
+            if (last) return p.points;
             return pow(p.points, c1) * pow((remaining_money - p.price), c2);
         }
 
@@ -162,7 +165,9 @@ void greedy(const Restrictions& restrictions, VP& all_players,
     Player p;
 
     // Parameters used to sort the players
-    double c1 = 1, c2 = 1.5;
+    double 
+        c1 = 1,     // exponent of the points of a player
+        c2 = 1.5;   // exponent of the remaining money after using player
     
     // While team is not full, we sort the players and add the first
     // player that satisfies the restrictions, at each iteration
@@ -173,7 +178,7 @@ void greedy(const Restrictions& restrictions, VP& all_players,
         sort(
             all_players.begin(),
             all_players.end(),
-            comp(c1, c2, restrictions.T - team.T, restrictions.T, restrictions.J)
+            comp(c1, c2, restrictions.T - team.T, restrictions.T, restrictions.J, total_players == 10)
         );
 
         // Finds first possible player, until found, removes
@@ -187,7 +192,7 @@ void greedy(const Restrictions& restrictions, VP& all_players,
         );
 
         add_player(team, p, size_pos[p.position]);
-        c1 *= (total_players + 12)/11;
+        c1 *= max((double) 1, ((double) 2 * total_players) / 11);
     }
 
     write_team(team, restrictions, output_file, start);
