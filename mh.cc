@@ -46,6 +46,17 @@ struct Team {
     // players: vector with the players
     int T, P;
     VVP players;
+
+    bool isOnTeam(const string& playerName) const {
+        for (const VP& playerVector : players) {
+            for (const Player& player : playerVector) {
+                if (player.name == playerName) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 };
 
 
@@ -139,24 +150,13 @@ void write_team(const Team& team, const Restrictions& restrictions, const string
 
 
 // to select a random player uniformly in the CL with position pos
-Player select_random_player(VP& candidate_list, int& alpha){
+Player select_random_player(VP& candidate_list, const int& alpha){
     Player p;
     int rnd = rand() % alpha;
     p = candidate_list[rnd];
-    // delete rnd player from the candidate list
-    alpha = alpha - 1;
+
     return p;
 }
-
-bool full(const vector<int>& size_pos, const Restrictions& restrictions){
-    for(int k = 0; k < 4; k++){
-        if(size_pos[k] != restrictions[k]){
-            return false;
-        }
-    }
-    return true;
-}   
-
 
 // generates a random_team
 Team greedy_radomized_team(const VP& all_players, const Restrictions& restrictions, const int& alpha){
@@ -172,36 +172,87 @@ Team greedy_radomized_team(const VP& all_players, const Restrictions& restrictio
     team = {0, 0, players};
     vector<int> size_pos = {0,0,0,0};
 
-    while(alpha > 0 and !full(team, restrictions)){
-        Player& p = select_random_player(all_players, alpha);
-        if(team.T + p.price <= restrictions.T and (restrictions.limits[p.position] > size_pos[p.position])){
-            add_player(team, p, size_pos[p.position]);
-        }  
-    }
+    while ((size_pos[0]+size_pos[1]+size_pos[2]+size_pos[3]) < 11){
+        // creem candidate list de mida alpha de jugadors que hi càpiguen al equip
+        int k = 0, j = 0;
+        VP CL;
+        while (k < alpha and j < all_players.size()){
+            // just to make sure that we have a CL even though we don't have >= alpha avaliable players we add the last constriction
+            Player p = all_players[j];
+            if(p.price + team.T <= restrictions.T and p.price < restrictions.J and size_pos[p.position] < restrictions.limits[p.position] and
+            !team.isOnTeam(p.name)){
+                CL.push_back(p)
+                k++;
+            }  
+            j++;
+        }
 
-    if (not full(team, restrictions)){
-        // add fake players to team
+        Player p = select_random_player(CL, CL.size());
+        add_player(team, p, size_pos[p.position]);
     }
 
     return team;
 }
 
 
+Team find_random_neighbour(const Team& team, const VP& all_players, const Restrictions& restrictions){
+    
+    while true{
+        Player p = all_players[randInt(all_players.size()-1)];
+        if(!team.isOnTeam(p)){
+            //exchange it with a player in team with same position
+            // as team is sorted, 
+            int index_deleted;
+            add_player(team, p, index_deleted);
+        }
+    }
+
+}
+
 // find the best team around team
 // searching players that fit the team that increases the team's points
-Team local_search(Team team, const VVP& all_players, const Restrictions& restrictions){
+Team local_search(const Team& team, const VVP& all_players, const Restrictions& restrictions){
+    
+    Team local_best = team;
+    // trobo una alineació veí, si és millor l'escullo, sino, amb probabilitat 1-p l'escullo
+    while true{
+        Team actual = team;
+        Team t = find_random_neighbour(actual, all_players, restrictions);
+
+        if (t.P > actual.P){
+            actual = t;
+
+            if (t.P > local_best){
+                local_best = t;
+            }
+        }
+        else{
+            // escullo un canvi que empitjora amb probabilitat inv. proporcional a l'empitjorament que aquest té
+            // Com mes empitjora el random neighour, menys possibilitats d'escollir-lo
+            // Generar un número aleatorio real entre 0 y 1
+            uniform_real_distribution<double> dis(0.0, 1.0);
+            double rnd = dis(gen);
+
+            if (rnd < 0.1 * t.P/actual.P){
+                actual = t;
+            }
+        }
+    }
+    
+    return local_best;
 
 }
 
 
 void metaheuristic(const Restrictions& restrictions, VVP& all_players,
             const string& output_file, const double& start){
-    Team team, best_team;
+    Team team1, team2, best_team;
     vector<int> alpha;
+    best_team.P = 0;
 
-    best_team = greedy_randomized_team(all_players, restrictions, alpha);
     while true{
-        team = local_search(best_team, all_players, restrictions);
+        ran_team = greedy_randomized_team(all_players, restrictions, alpha);
+        team = local_search(ran_team, all_players, restrictions);
 
         if (team.P > best_team.P) best_team = team;
     }
