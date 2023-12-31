@@ -23,32 +23,37 @@ using VP = vector<Player>;
 using VVP = vector<VP>;
 
 
-// Used to define the restrictions
+/*
+    Used to define the restrictions
+        limits:
+            pos 0: required goalkeepers
+            pos 1: required defenders
+            pos 2: required midfielders
+            pos 3: required attackers
+        T: total limit
+        J: limit per player
+*/
 struct Restrictions {
-    // limits:
-    // 0: required goalkeepers
-    // 1: required defenders
-    // 2: required midfielders
-    // 3: required attackers
     VI limits;
-    // T: total limit
-    // J: limit per player
     int T, J;
 };
 
 
-// Used to define our current team
+/*
+    Used to define our current team
+        T: current cost
+        P: current points
+        players: vector with the players
+*/
 struct Team {
-    // T: current cost
-    // P: current points
-    // players: vector with the players
     int T, P;
     VVP players;
 };
 
 
+// Returns processor time consumed by the program in seconds
 double time(){
-    return clock() / CLOCKS_PER_SEC;
+    return (double) clock() / CLOCKS_PER_SEC;
 }
 
 
@@ -75,8 +80,10 @@ class comp {
 };
 
 
-// Reads data file containing players, saves all players into "all_players" as long as their price
-// is less than or equal to the limit per player given
+/*
+    Reads data file containing players, saves all players into "all_players" as long as their price
+    is less than or equal to the limit per player given
+*/
 void read_players(const string& data_file, VP& all_players, const int& limit){
     ifstream input(data_file);
     string bin; char cbin;
@@ -91,6 +98,7 @@ void read_players(const string& data_file, VP& all_players, const int& limit){
         getline(input, bin, ';');
         input >> points;
         getline(input, bin);
+        // Ignores players more expensive than limit
         if (price <= limit) {
             if (position_name == "por") position = 0;
             else if (position_name == "def") position = 1;
