@@ -25,25 +25,31 @@ using VP = vector<Player>;
 using VVP = vector<VP>;
 
 
-// Used to define the restrictions
+/*
+    Used to define the restrictions
+        limits:
+            pos 0: required goalkeepers
+            pos 1: required defenders
+            pos 2: required midfielders
+            pos 3: required attackers
+        T: total limit
+        J: limit per player
+*/
 struct Restrictions {
-    // limits:
-    // 0: required goalkeepers
-    // 1: required defenders
-    // 2: required midfielders
-    // 3: required attackers
     VI limits;
-    // T: total limit
-    // J: limit per player
     int T, J;
 };
 
 
-// Used to define our current team
+/*
+    Used to define our current team
+        T: current cost
+        P: current points
+        players: vector with the players
+
+        isOnTeam: indicates if player is on team
+*/
 struct Team {
-    // T: current cost
-    // P: current points
-    // players: vector with the players
     int T, P;
     VVP players;
 
@@ -60,8 +66,9 @@ struct Team {
 };
 
 
+// Returns processor time consumed by the program in seconds
 double time(){
-    return clock() / CLOCKS_PER_SEC;
+    return (double) clock() / CLOCKS_PER_SEC;
 }
 
 
@@ -72,7 +79,7 @@ class comp {
         comp(double c1, double c2) : c1(c1), c2(c2) {}
 
         double value(const Player& p) const {
-            return pow(p.points, c1) * pow((p.price), c2);
+            return pow(p.points, c1) / pow(p.price, c2);
         }
 
         bool operator()(const Player& p1, const Player& p2) const {
@@ -83,8 +90,10 @@ class comp {
 };
 
 
-// Reads data file containing players, saves all players into "all_players" as long as their price
-// is less than or equal to the limit per player given
+/*
+Reads data file containing players, saves all players into "all_players" as long as their price
+is less than or equal to the limit per player given
+*/
 void read_players(const string& data_file, VP& all_players, const int& limit){
     ifstream input(data_file);
     string bin; char cbin;
@@ -99,6 +108,7 @@ void read_players(const string& data_file, VP& all_players, const int& limit){
         getline(input, bin, ';');
         input >> points;
         getline(input, bin);
+        // Ignores players more expensive than limit
         if (price <= limit) {
             if (position_name == "por") position = 0;
             else if (position_name == "def") position = 1;
@@ -156,10 +166,9 @@ void write_team(const Team& team, const Restrictions& restrictions, const string
 }
 
 
-double generate_random_parameter(double lower, double upper){
-    uniform_real_distribution<double> unif(lower, upper);
-    default_random_engine re;
-    return unif(re);
+double generate_random_number(double lower, double upper){
+    double random = (double) rand() / RAND_MAX;
+    return lower + random * (upper - lower);
 }
 
 
@@ -184,8 +193,8 @@ Player select_random_player(VP& candidate_list){
 // generates a random_team
 Team greedy_randomized_team(VP& all_players, const Restrictions& restrictions, const int& alpha){
 
-    double c1 = generate_random_parameter(2, 4);
-    double c2 = generate_random_parameter(1, 3);
+    double c1 = generate_random_number(3, 8);
+    double c2 = generate_random_number(1, 6);
 
     sort(all_players.begin(), all_players.end(), comp(c1, c2));
 
@@ -277,7 +286,7 @@ Team local_search(const Team& team, const VP& all_players, const Restrictions& r
             // escullo un canvi que empitjora amb probabilitat inv. proporcional a l'empitjorament que aquest té
             // Com mes empitjora el random neighour, menys possibilitats d'escollir-lo
             // Generar un número aleatorio real entre 0 y 100
-            double random = (double) rand() / RAND_MAX;
+            double random = generate_random_number(0, 1);
             double prob = boltzman_probability(t.P, actual.P, T);
             if (random <= prob){
                 actual = t;
@@ -299,7 +308,7 @@ void metaheuristic(const Restrictions& restrictions, VP& all_players,
     int alpha = 10;
     best_team.P = 0;
 
-    for(int k = 0; k < 1e4; ++k){
+    for(int k = 0; k < 2e4; ++k){
         team = greedy_randomized_team(all_players, restrictions, alpha);
         team = local_search(team, all_players, restrictions);
 
