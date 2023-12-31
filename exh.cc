@@ -126,11 +126,7 @@ bool is_team_valid(const Team& team, const Restrictions& restrictions, const VVP
 
     return (
         (theoretical_max > best_team.P) and
-        (team.T <= restrictions.T) // and
-        // not (
-        //     best_team.players[position][players_in_position].points > team.players[position][players_in_position].points and 
-        //     best_team.players[position][players_in_position].price < team.players[position][players_in_position].price
-        // )
+        (team.T <= restrictions.T)
     );
 }
 

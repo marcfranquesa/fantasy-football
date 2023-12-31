@@ -65,9 +65,22 @@ double time(){
 }
 
 
-bool comp(const Player& a, const Player& b) {
-    return (double) a.points / a.price > (double) b.points / b.price;
-}
+// Defined as a class to be able to initialise it with parameters
+class comp {
+    double c1, c2;
+    public:
+        comp(double c1, double c2) : c1(c1), c2(c2) {}
+
+        double value(const Player& p) const {
+            return pow(p.points, c1) * pow((p.price), c2);
+        }
+
+        bool operator()(const Player& p1, const Player& p2) const {
+            if (p1.points == 0 and not (p2.points == 0)) return false;
+            if (p2.points == 0 and not (p1.points == 0)) return true;
+            return value(p1) > value(p2);
+        }
+};
 
 
 // Reads data file containing players, saves all players into "all_players" as long as their price
@@ -76,7 +89,6 @@ void read_players(const string& data_file, VP& all_players, const int& limit){
     ifstream input(data_file);
     string bin; char cbin;
     string position_name;
-    int position;
     while (not input.eof()) {
         Player player;
         auto& [name, price, points, position] = player;
@@ -97,8 +109,6 @@ void read_players(const string& data_file, VP& all_players, const int& limit){
         }
     }
     input.close();
-
-    sort(all_players.begin(), all_players.end(), comp);
 }
 
 
@@ -128,7 +138,6 @@ void add_player(Team& team, const Player& player, int& index){
 }
 
 
-
 void write_team(const Team& team, const Restrictions& restrictions, const string& outputFile, const double& start){
     ofstream File;
     File.open(outputFile);
@@ -145,6 +154,14 @@ void write_team(const Team& team, const Restrictions& restrictions, const string
 
     File.close();
 }
+
+
+double generate_random_parameter(double lower, double upper){
+    uniform_real_distribution<double> unif(lower, upper);
+    default_random_engine re;
+    return unif(re);
+}
+
 
 bool is_player_valid(const Team& team, const Restrictions& restrictions, const Player& p, const VI& size_pos){
     return (
@@ -165,7 +182,12 @@ Player select_random_player(VP& candidate_list){
 }
 
 // generates a random_team
-Team greedy_randomized_team(const VP& all_players, const Restrictions& restrictions, const int& alpha){
+Team greedy_randomized_team(VP& all_players, const Restrictions& restrictions, const int& alpha){
+
+    double c1 = generate_random_parameter(2, 4);
+    double c2 = generate_random_parameter(1, 3);
+
+    sort(all_players.begin(), all_players.end(), comp(c1, c2));
 
     // Initialising empty team
     VVP players = {
@@ -225,6 +247,7 @@ Team find_random_neighbour(Team team, const VP& all_players, const Restrictions&
     return team;
 }
 
+
 double boltzman_probability(const int& punts1, const int& punts2, const int& T){
     return exp((double) (punts1 - punts2) / T);
 }
@@ -240,7 +263,7 @@ Team local_search(const Team& team, const VP& all_players, const Restrictions& r
     int T = 1e8;
     const double a = 0.99;
     // trobo una alineació veí, si és millor l'escullo, sino, amb probabilitat 1-p l'escullo
-    while (k < 1e5){
+    while (k < 1e4){
         Team t = find_random_neighbour(actual, all_players, restrictions);
 
         if (t.P > actual.P){
@@ -276,7 +299,7 @@ void metaheuristic(const Restrictions& restrictions, VP& all_players,
     int alpha = 10;
     best_team.P = 0;
 
-    for(int k = 0; k < 1000; ++k){
+    for(int k = 0; k < 1e4; ++k){
         team = greedy_randomized_team(all_players, restrictions, alpha);
         team = local_search(team, all_players, restrictions);
 
