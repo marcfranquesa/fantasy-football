@@ -14,6 +14,7 @@ struct Player {
     string name;
     int price;
     int points;
+    int position;
 };
 
 using Players = vector<Player>;
@@ -64,14 +65,13 @@ bool player_sorter(const Player& a, const Player& b) {
     Reads data file containing players, saves all players into "all_players" as long as their price
     is less than or equal to the limit per player given
 */
-void read_players(const string& data_file, PlayersByPosition& all_players, const int& limit){
+void read_players(const string& data_file, Players& all_players, const int& limit){
     ifstream input(data_file);
     string bin; char cbin;
     string position_name;
-    int position;
     while (not input.eof()) {
         Player player;
-        auto& [name, price, points] = player;
+        auto& [name, price, points, position] = player;
         getline(input, name, ';');    if (name == "") break;
         getline(input, position_name, ';');
         input >> price;
@@ -86,16 +86,16 @@ void read_players(const string& data_file, PlayersByPosition& all_players, const
             else if (position_name == "mig") position = 2;
             else if (position_name == "dav") position = 3;
             else throw invalid_argument("Invalid position");
-            all_players[position].push_back(player);
+            all_players.push_back(player);
         }
     }
     input.close();
 
-    for (Players& position : all_players) sort(position.begin(), position.end(), player_sorter);
+    sort(all_players.begin(), all_players.end(), player_sorter);
 }
 
 
-void read_input(int argc, char** argv, Restrictions& restrictions, PlayersByPosition& all_players){
+void read_input(int argc, char** argv, Restrictions& restrictions, Players& all_players){
     if (argc != 4) {
         cout << "Incorrect Syntax" << endl;
         cout << "    Syntax:  " << argv[0] << " <data_file> <input_file> <output_file>" << endl;
@@ -115,32 +115,45 @@ void read_input(int argc, char** argv, Restrictions& restrictions, PlayersByPosi
 
 // Can also be used to remove from team
 void add_player(
-    Team& team, const Player& player, const int& position, const int& index, const bool& remove
+    Team& team, const Player& player, vector<int>& players_per_position, const bool& remove
 ){
-    int multiplier = (remove ? -1 : 1);
+    int multiplier = -1;
+    int position = player.position;
+    if (not remove) {
+        team.players[position][players_per_position[position]] = player;
+        multiplier = 1;
+    }
     team.P += player.points * multiplier;
     team.T += player.price * multiplier;
-    team.players[position][index] = player;
+    players_per_position[position] += multiplier;
 }
 
 
-bool is_team_worth_pursuing(
-    const Team& team, const Restrictions& restrictions, const PlayersByPosition& all_players,
-    const Team& best_team, const int& position, const int& player_index,
-    const int& players_in_position
-){
-    int theoretical_max = team.P;
-    for (int i = players_in_position + 1; i < restrictions.limits[position]; ++i){
-        theoretical_max += all_players[position][player_index + i - players_in_position].points;
-    }
-    for (int i = position + 1; i < 4; ++i) for (int j = 0; j < restrictions.limits[i]; ++j){
-        theoretical_max += all_players[i][j].points;
-    }
+/*
+    Exhaustive search prunes, if either of the following conditions are met:
 
-    return (
-        (theoretical_max > best_team.P) and
-        (team.T <= restrictions.T)
-    );
+    * We have already reached the limit of players for the specific position
+    * The player's price would make the teams price exceed the total limit
+    * The theoretical maximum points of the team would be less than the current best team
+    
+    return false, otherwise return true
+*/
+bool is_team_worth_pursuing(
+    const Team& team, const Restrictions& restrictions, const Players& all_players,
+    const Team& best_team, const int& player_index, const int& total_players,
+    const vector<int>& players_per_position
+){
+    int position = all_players[player_index].position;
+
+    if (players_per_position[position] == restrictions.limits[position]) return false;
+    if (team.T + all_players[player_index].price > restrictions.T) return false;
+
+    int theoretical_max = team.P + all_players[player_index].points;
+    theoretical_max += all_players[player_index + 1].points * (10 - total_players);
+
+    if (theoretical_max <= best_team.P) return false;
+
+    return true;
 }
 
 
@@ -165,38 +178,27 @@ void write_team(
 }
 
 
-/*
-    Exhaustive search algorithm, searching is done incrementally by position,
-    first a goalkeeper is placed, then defenders, etc.
-    At any moment only players that have assigned the current position
-    are searched.
-*/
+// Exhaustive search algorithm, searches for the best team possible
 void search(
-    Team& team, const Restrictions& restrictions, const PlayersByPosition& all_players,
+    Team& team, const Restrictions& restrictions, const Players& all_players,
     const string& output_file, const double& start, Team& best_team,
-    const int& position, const int& previous_player_index, const int& players_in_position
+    const int& previous_player_index, const int& total_players, vector<int>& players_per_position
 ){
-
-    if (players_in_position == restrictions.limits[position]){
-        if (position == 3) { if (team.P > best_team.P) {
-            write_team(team, restrictions, output_file, start);
-            best_team = team;
-        }}
-        else search(team, restrictions, all_players, output_file, start, best_team, position + 1, -1, 0);
+    if (total_players == 11){
+        // No need to check any other condition as this is done
+        // before calling the function in "is_team_worth_pursuing"
+        write_team(team, restrictions, output_file, start);
+        best_team = team;
         return;
     }
 
-    int options = all_players[position].size();
-    for (
-        int i = previous_player_index + 1; 
-        (i < (int) options) and (options - i >= restrictions.limits[position] - players_in_position);
-        ++i
-    ){
-        add_player(team, all_players[position][i], position, players_in_position, false);
-        if (is_team_worth_pursuing(team, restrictions, all_players, best_team, position, i, players_in_position)){
-            search(team, restrictions, all_players, output_file, start, best_team, position, i, players_in_position + 1);
+    int options = all_players.size();
+    for (int player_index = previous_player_index + 1; player_index < (int) options; ++player_index){
+        if (is_team_worth_pursuing(team, restrictions, all_players, best_team, player_index, total_players, players_per_position)){
+            add_player(team, all_players[player_index], players_per_position, false);
+            search(team, restrictions, all_players, output_file, start, best_team, player_index, total_players + 1, players_per_position);
+            add_player(team, all_players[player_index], players_per_position, true);
         }
-        add_player(team, all_players[position][i], position, players_in_position, true);
     }
 }
 
@@ -205,7 +207,7 @@ int main(int argc, char** argv) {
 
     double start = time();
     Restrictions restrictions;
-    PlayersByPosition all_players(4);
+    Players all_players;
     read_input(argc, argv, restrictions, all_players);
     const string output_file = argv[3];
 
@@ -218,6 +220,7 @@ int main(int argc, char** argv) {
     };
     Team team = {0, 0, players};
     Team best_team = {0, 0, players};
+    vector<int> players_per_position = {0, 0, 0, 0};
 
-    search(team, restrictions, all_players, output_file, start, best_team, 0, -1, 0);
+    search(team, restrictions, all_players, output_file, start, best_team, -1, 0, players_per_position);
 }
