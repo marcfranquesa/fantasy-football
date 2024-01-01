@@ -172,10 +172,9 @@ void greedy(const Restrictions& restrictions, VP& all_players,
     VI size_pos = {0, 0, 0, 0};
     Player p;
 
-    // Parameters used to sort the players
-    double 
-        c1 = 1,     // exponent of the points of a player
-        c2 = 1.5;   // exponent of the remaining money after using player
+    // Parameters used to sort the players 
+    double c1 = 1;     // exponent of the points of a player
+    double c2 = 1.5;   // exponent of the remaining money after using player
     
     // While team is not full, we sort the players and add the first
     // player that satisfies the restrictions, at each iteration
