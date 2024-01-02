@@ -1,4 +1,3 @@
-// Exhaustive search for best team
 #include <iostream>
 #include <vector>
 #include <string>
@@ -18,7 +17,8 @@ struct Player {
 };
 
 using Players = vector<Player>;
-using PlayersByPosition = vector<Players>;
+using PlayerNames = vector<string>;
+using PlayerNamesByPosition = vector<PlayerNames>;
 
 
 /*
@@ -45,7 +45,7 @@ struct Restrictions {
 */
 struct Team {
     int T, P;
-    PlayersByPosition players;
+    PlayerNamesByPosition players;
 };
 
 
@@ -109,7 +109,7 @@ void read_input(int argc, char** argv, Restrictions& restrictions, Players& all_
     limits = {1, N1, N2, N3};
     input.close();
 
-    read_players(argv[1], all_players, J);
+    read_players(argv[1], all_players, min(T, J));
 }
 
 
@@ -118,13 +118,14 @@ void add_player(
     Team& team, const Player& player, vector<int>& players_per_position, const bool& remove
 ){
     int multiplier = -1;
-    int position = player.position;
+    const auto& [name, price, points, position] = player;
+    
     if (not remove) {
-        team.players[position][players_per_position[position]] = player;
+        team.players[position][players_per_position[position]] = name;
         multiplier = 1;
     }
-    team.P += player.points * multiplier;
-    team.T += player.price * multiplier;
+    team.P += points * multiplier;
+    team.T += price * multiplier;
     players_per_position[position] += multiplier;
 }
 
@@ -139,17 +140,21 @@ void add_player(
     return false, otherwise return true
 */
 bool is_team_worth_pursuing(
-    const Team& team, const Restrictions& restrictions, const Players& all_players,
-    const Team& best_team, const int& player_index, const int& total_players,
-    const vector<int>& players_per_position
+    const Team& team, const Restrictions& restrictions, const Player& player,
+    const Team& best_team, const int& total_players, const vector<int>& players_per_position
 ){
-    int position = all_players[player_index].position;
+    const auto& [_, price, points, position] = player;
 
     if (players_per_position[position] == restrictions.limits[position]) return false;
-    if (team.T + all_players[player_index].price > restrictions.T) return false;
+    if (team.T + price > restrictions.T) return false;
 
-    int theoretical_max = team.P + all_players[player_index].points;
-    theoretical_max += all_players[player_index + 1].points * (10 - total_players);
+    int theoretical_max = team.P;
+    /*
+        Could use the next players points, however in the case of 
+        being in the last indexes it would not be valid, this makes it 
+        easier to implement without much drawback 
+    */
+    theoretical_max += points * (11 - total_players);
 
     if (theoretical_max <= best_team.P) return false;
 
@@ -166,8 +171,8 @@ void write_team(
     File << fixed << setprecision(1) << time() - start << endl;
     vector<string> titles = {"POR: ", "DEF: ", "MIG: ", "DAV: "};
     for (int i = 0; i < 4; ++i){
-        File << titles[i] << team.players[i][0].name;
-        for (int j = 1; j < restrictions.limits[i]; ++j) File << ';' << team.players[i][j].name;
+        File << titles[i] << team.players[i][0];
+        for (int j = 1; j < restrictions.limits[i]; ++j) File << ';' << team.players[i][j];
         File << endl;
     }
 
@@ -185,16 +190,18 @@ void search(
     const int& previous_player_index, const int& total_players, vector<int>& players_per_position
 ){
     if (total_players == 11){
-        // No need to check any other condition as this is done
-        // before calling the function in "is_team_worth_pursuing"
+        /*
+            No need to check any other condition as this is done
+            before calling the function in "is_team_worth_pursuing"
+        */
         write_team(team, restrictions, output_file, start);
         best_team = team;
         return;
     }
 
-    int options = all_players.size();
-    for (int player_index = previous_player_index + 1; player_index < (int) options; ++player_index){
-        if (is_team_worth_pursuing(team, restrictions, all_players, best_team, player_index, total_players, players_per_position)){
+    const int& options = all_players.size();
+    for (int player_index = previous_player_index + 1; player_index < options; ++player_index){
+        if (is_team_worth_pursuing(team, restrictions, all_players[player_index], best_team, total_players, players_per_position)){
             add_player(team, all_players[player_index], players_per_position, false);
             search(team, restrictions, all_players, output_file, start, best_team, player_index, total_players + 1, players_per_position);
             add_player(team, all_players[player_index], players_per_position, true);
@@ -212,15 +219,15 @@ int main(int argc, char** argv) {
     const string output_file = argv[3];
 
     // Initialising empty candidate team
-    PlayersByPosition players = {
-        Players(restrictions.limits[0]),
-        Players(restrictions.limits[1]),
-        Players(restrictions.limits[2]),
-        Players(restrictions.limits[3])
+    PlayerNamesByPosition players = {
+        PlayerNames(restrictions.limits[0]),
+        PlayerNames(restrictions.limits[1]),
+        PlayerNames(restrictions.limits[2]),
+        PlayerNames(restrictions.limits[3])
     };
     Team team = {0, 0, players};
     Team best_team = {0, 0, players};
-    vector<int> players_per_position = {0, 0, 0, 0};
+    vector<int> players_per_position = vector<int>(4, 0);
 
     search(team, restrictions, all_players, output_file, start, best_team, -1, 0, players_per_position);
 }
