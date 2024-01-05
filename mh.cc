@@ -11,7 +11,6 @@
 #include <cstdlib>
 using namespace std;
 
-using VI = vector<int>;
 
 
 struct Player {
@@ -21,29 +20,36 @@ struct Player {
     int position;
 };
 
+using VI = vector<int>;
 using VP = vector<Player>;
 using VVP = vector<VP>;
 
 
-// Used to define the restrictions
+/*
+    Used to define the restrictions
+        limits:
+            pos 0: required goalkeepers
+            pos 1: required defenders
+            pos 2: required midfielders
+            pos 3: required attackers
+        T: total limit
+        J: limit per player
+*/
 struct Restrictions {
-    // limits:
-    // 0: required goalkeepers
-    // 1: required defenders
-    // 2: required midfielders
-    // 3: required attackers
     VI limits;
-    // T: total limit
-    // J: limit per player
     int T, J;
 };
 
 
-// Used to define our current team
+/*
+    Used to define our current team
+        T: current cost
+        P: current points
+        players: vector with the players
+
+        isOnTeam: indicates if player is on team
+*/
 struct Team {
-    // T: current cost
-    // P: current points
-    // players: vector with the players
     int T, P;
     VVP players;
 
@@ -60,25 +66,38 @@ struct Team {
 };
 
 
+// Returns processor time consumed by the program in seconds
 double time(){
-    return clock() / CLOCKS_PER_SEC;
+    return (double) clock() / CLOCKS_PER_SEC;
 }
 
 
-bool comp(const Player& a, const Player& b) {
-    const double c1 = 4;
-    const double c2 = 1;
-    return (pow(a.points, c1) / pow(a.price, c2)) > (pow(b.points, c1) / pow(b.price, c2));
-}
+// Defined as a class to be able to initialise it with parameters
+class comp {
+    double c1, c2;
+    public:
+        comp(double c1, double c2) : c1(c1), c2(c2) {}
+
+        double value(const Player& p) const {
+            return pow(p.points, c1) / pow(p.price, c2);
+        }
+
+        bool operator()(const Player& p1, const Player& p2) const {
+            if (p1.points == 0 and not (p2.points == 0)) return false;
+            if (p2.points == 0 and not (p1.points == 0)) return true;
+            return value(p1) > value(p2);
+        }
+};
 
 
-// Reads data file containing players, saves all players into "all_players" as long as their price
-// is less than or equal to the limit per player given
+/*
+Reads data file containing players, saves all players into "all_players" as long as their price
+is less than or equal to the limit per player given
+*/
 void read_players(const string& data_file, VP& all_players, const int& limit){
     ifstream input(data_file);
     string bin; char cbin;
     string position_name;
-    int position;
     while (not input.eof()) {
         Player player;
         auto& [name, price, points, position] = player;
@@ -89,6 +108,7 @@ void read_players(const string& data_file, VP& all_players, const int& limit){
         getline(input, bin, ';');
         input >> points;
         getline(input, bin);
+        // Ignores players more expensive than limit
         if (price <= limit) {
             if (position_name == "por") position = 0;
             else if (position_name == "def") position = 1;
@@ -99,8 +119,6 @@ void read_players(const string& data_file, VP& all_players, const int& limit){
         }
     }
     input.close();
-
-    sort(all_players.begin(), all_players.end(), comp);
 }
 
 
@@ -130,7 +148,6 @@ void add_player(Team& team, const Player& player, int& index){
 }
 
 
-
 void write_team(const Team& team, const Restrictions& restrictions, const string& outputFile, const double& start){
     ofstream File;
     File.open(outputFile);
@@ -149,8 +166,24 @@ void write_team(const Team& team, const Restrictions& restrictions, const string
 }
 
 
+double generate_random_number(double lower, double upper){
+    double random = (double) rand() / RAND_MAX;
+    return lower + random * (upper - lower);
+}
 
-// to select a random player uniformly in the CL with position pos
+
+// Checks if a player can be added to the team based on the restrictions.
+bool is_player_valid(const Team& team, const Restrictions& restrictions, const Player& p, const VI& size_pos){
+    return (
+        p.price + team.T <= restrictions.T and
+        p.price <= restrictions.J and
+        size_pos[p.position] < restrictions.limits[p.position] and
+        not team.isOnTeam(p.name)
+    );
+}
+
+
+// Randomly select a player from the Candidate List with the position 'pos' using a uniform distribution
 Player select_random_player(VP& candidate_list){
 
     int rnd = rand() % candidate_list.size();
@@ -158,8 +191,13 @@ Player select_random_player(VP& candidate_list){
     return candidate_list[rnd];
 }
 
-// generates a random_team
-Team greedy_randomized_team(const VP& all_players, const Restrictions& restrictions, const int& alpha){
+// Generates a random_team
+Team greedy_randomized_team(VP& all_players, const Restrictions& restrictions, const int& alpha){
+
+    double c1 = generate_random_number(3, 8);
+    double c2 = generate_random_number(1, 6);
+
+    sort(all_players.begin(), all_players.end(), comp(c1, c2));
 
     // Initialising empty team
     VVP players = {
@@ -168,24 +206,25 @@ Team greedy_randomized_team(const VP& all_players, const Restrictions& restricti
         VP(restrictions.limits[2]),
         VP(restrictions.limits[3])
     };
-    Team team;
-    team = {0, 0, players};
-    vector<int> size_pos = {0,0,0,0};
 
-    while (size_pos[1] != restrictions.limits[1] or size_pos[2]!= restrictions.limits[2] or size_pos[3] != restrictions.limits[3] or size_pos[0] != 1){
-        // creem candidate list de mida alpha de jugadors que hi càpiguen al equip
-        int k = 0;
-        int j = 0;
-        VP CL;
-        while (k < alpha and j < all_players.size()){
-            // just to make sure that we have a CL even though we don't have >= alpha avaliable players we add the last constriction
+    Team team = {0, 0, players};
+    VI size_pos = {0, 0, 0, 0};
+    VP CL;
+    int k; // iterator of the CL
+    int j; // iterator of all_players
+
+    for (int total_players = 0; total_players < 11; ++total_players){
+        // Create a candidate list and select a random player
+        CL = VP();
+
+        // Generate a candidate list with the first alpha available players from 'all_players' (already sorted)
+        // We introduced the second condition in the event that there are no alpha players available to add.
+        for (j = k = 0; k < alpha and j < all_players.size(); ++j){
             Player p = all_players[j];
-            if(p.price + team.T <= restrictions.T and p.price <= restrictions.J and size_pos[p.position] < restrictions.limits[p.position] and
-            !team.isOnTeam(p.name)){
+            if (is_player_valid(team, restrictions, p, size_pos)){
                 CL.push_back(p);
                 k++;
-            }  
-            j++;
+            }
         }
 
         Player p = select_random_player(CL);
@@ -196,24 +235,25 @@ Team greedy_randomized_team(const VP& all_players, const Restrictions& restricti
 }
 
 
+// Returns a random neighbour team
 Team find_random_neighbour(Team team, const VP& all_players, const Restrictions& restrictions){
 
-    int found = 0;
-    while (found == 0){
+    bool found = false;
+    while (not found){
+        // find a random player
         int index_rnd = rand() % all_players.size();
         Player p = all_players[index_rnd];
-        if(!team.isOnTeam(p.name)){
-            //exchange it with a player in team with same position
-            
+        if(not team.isOnTeam(p.name)){
+            // exchange it with a player in team with same position chosen randomly
             int index_deleted = rand() % restrictions.limits[p.position];
             Player p_deleted = team.players[p.position][index_deleted];
+
             if(team.T + p.price - p_deleted.price < restrictions.T){
                 team.T -= p_deleted.price;
                 team.P -= p_deleted.points;
-
                 add_player(team, p, index_deleted);
                 
-                found = 1;
+                found = true;
             }
         }
     }
@@ -221,39 +261,39 @@ Team find_random_neighbour(Team team, const VP& all_players, const Restrictions&
     return team;
 }
 
-double Boltzman_probability(const int& punts1, const int& punts2, const int& T){
-    return exp(static_cast<double>(punts1 - punts2) / T);
+
+// Defines the probability of accepting a worsening move using Boltzman probability
+double boltzman_probability(const int& punts1, const int& punts2, const int& T){
+    return exp((double) (punts1 - punts2) / T);
 }
 
 
-// find the best team around team
-// searching players that fit the team that increases the team's points
+/* 
+    Applies a local search around team
+    Using Simulated Annnealing, allowing teams with less points
+    After 50 steps without any improvement we move on to the next random team
+*/
 Team local_search(const Team& team, const VP& all_players, const Restrictions& restrictions){
     
     Team local_best = team;
     Team actual = team;
-    int k = 0;
-    int T = 1e8;
-    const double a = 0.99;
-    // trobo una alineació veí, si és millor l'escullo, sino, amb probabilitat 1-p l'escullo
-    while (k < 10000){
-        
+    int k = 0; // counts the number of steps without any improvement 
+    int T = 1e5; // Boltzman temperature
+    const double a = 0.7; // geometric constant
+
+    while (k < 50){
         Team t = find_random_neighbour(actual, all_players, restrictions);
 
         if (t.P > actual.P){
             actual = t;
-
             if (t.P > local_best.P){
                 local_best = t;
                 k = 0;
             }
         }
         else{
-            // escullo un canvi que empitjora amb probabilitat inv. proporcional a l'empitjorament que aquest té
-            // Com mes empitjora el random neighour, menys possibilitats d'escollir-lo
-            // Generar un número aleatorio real entre 0 y 100
-            double random = static_cast<double>(rand()) / RAND_MAX;
-            double prob = Boltzman_probability(t.P, actual.P, T);
+            double random = generate_random_number(0, 1);
+            double prob = boltzman_probability(t.P, actual.P, T);
             if (random <= prob){
                 actual = t;
             }
@@ -269,21 +309,20 @@ Team local_search(const Team& team, const VP& all_players, const Restrictions& r
 
 
 void metaheuristic(const Restrictions& restrictions, VP& all_players,
-            const string& output_file, const double& start){
-    Team team, rand_team, best_team;
-    int alpha = 4;
+                   const string& output_file, const double& start){
+    Team team, best_team;
+    int alpha = 5; // CL size
     best_team.P = 0;
-    int k = 0;
 
-    while(k < 50){
-        rand_team = greedy_randomized_team(all_players, restrictions, alpha);
-        team = local_search(rand_team, all_players, restrictions);
+    for(int k = 0; k < 5e4; ++k){
+        team = greedy_randomized_team(all_players, restrictions, alpha);
+        team = local_search(team, all_players, restrictions);
 
-        if (team.P >= best_team.P) best_team = team;
-
-        k++;
+        if (team.P > best_team.P){
+            best_team = team;
+            write_team(best_team, restrictions, output_file, start);
+        }
     }
-    write_team(best_team, restrictions, output_file, start);
 }
 
 

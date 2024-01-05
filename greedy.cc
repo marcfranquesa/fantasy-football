@@ -9,7 +9,6 @@
 #include <cmath>
 using namespace std;
 
-using VI = vector<int>;
 
 
 struct Player {
@@ -19,34 +18,41 @@ struct Player {
     int position;
 };
 
+using VI = vector<int>;
 using VP = vector<Player>;
 using VVP = vector<VP>;
 
 
-// Used to define the restrictions
+/*
+    Used to define the restrictions
+        limits:
+            pos 0: required goalkeepers
+            pos 1: required defenders
+            pos 2: required midfielders
+            pos 3: required attackers
+        T: total limit
+        J: limit per player
+*/
 struct Restrictions {
-    // limits:
-    // 0: required goalkeepers
-    // 1: required defenders
-    // 2: required midfielders
-    // 3: required attackers
     VI limits;
-    // T: total limit
-    // J: limit per player
     int T, J;
 };
 
 
-// Used to define our current team
+/*
+    Used to define our current team
+        T: current cost
+        P: current points
+        players: vector with the players
+
+*/
 struct Team {
-    // T: current cost
-    // P: current points
-    // players: vector with the players
     int T, P;
     VVP players;
 };
 
 
+// Returns processor time consumed by the program in seconds
 double time(){
     return clock() / CLOCKS_PER_SEC;
 }
@@ -55,12 +61,11 @@ double time(){
 // Defined as a class to be able to initialise it with parameters
 class comp {
     double c1, c2;
-    int remaining_money, total_budget, max_cost;
+    int remaining_money;
     bool last;
     public:
-        comp(double c1, double c2, int remaining_money, int total_budget, int max_points, bool last)
-            : c1(c1), c2(c2), remaining_money(remaining_money), total_budget(total_budget),
-            max_cost(max_cost), last(last){}
+        comp(double c1, double c2, int remaining_money, bool last)
+            : c1(c1), c2(c2), remaining_money(remaining_money), last(last){}
 
         double value(const Player& p) const {
             if (last) return p.points;
@@ -178,7 +183,7 @@ void greedy(const Restrictions& restrictions, VP& all_players,
         sort(
             all_players.begin(),
             all_players.end(),
-            comp(c1, c2, restrictions.T - team.T, restrictions.T, restrictions.J, total_players == 10)
+            comp(c1, c2, restrictions.T - team.T, total_players == 10)
         );
 
         // Finds first possible player, until found, removes
