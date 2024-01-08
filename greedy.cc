@@ -10,7 +10,6 @@
 using namespace std;
 
 
-
 struct Player {
     string name;
     int price;
@@ -18,9 +17,8 @@ struct Player {
     int position;
 };
 
-using VI = vector<int>;
-using VP = vector<Player>;
-using VVP = vector<VP>;
+using Players = vector<Player>;
+using PlayersByPosition = vector<Players>;
 
 
 /*
@@ -34,7 +32,7 @@ using VVP = vector<VP>;
         J: limit per player
 */
 struct Restrictions {
-    VI limits;
+    vector<int> limits;
     int T, J;
 };
 
@@ -48,23 +46,23 @@ struct Restrictions {
 */
 struct Team {
     int T, P;
-    VVP players;
+    PlayersByPosition players;
 };
 
 
 // Returns processor time consumed by the program in seconds
 double time(){
-    return clock() / CLOCKS_PER_SEC;
+    return (double) clock() / CLOCKS_PER_SEC;
 }
 
 
 // Defined as a class to be able to initialise it with parameters
-class comp {
+class player_sorter {
     double c1, c2;
     int remaining_money;
     bool last;
     public:
-        comp(double c1, double c2, int remaining_money, bool last)
+        player_sorter(double c1, double c2, int remaining_money, bool last)
             : c1(c1), c2(c2), remaining_money(remaining_money), last(last){}
 
         double value(const Player& p) const {
@@ -80,9 +78,11 @@ class comp {
 };
 
 
-// Reads data file containing players, saves all players into "all_players" as long as their price
-// is less than or equal to the limit per player given
-void read_players(const string& data_file, VP& all_players, const int& limit){
+/*
+    Reads data file containing players, saves all players into "all_players" as long as their price
+    is less than or equal to the limit per player given
+*/
+void read_players(const string& data_file, Players& all_players, const int& limit){
     ifstream input(data_file);
     string bin; char cbin;
     string position_name;
@@ -109,7 +109,7 @@ void read_players(const string& data_file, VP& all_players, const int& limit){
 }
 
 
-void read_input(int argc, char** argv, Restrictions& restrictions, VP& all_players){
+void read_input(int argc, char** argv, Restrictions& restrictions, Players& all_players){
     if (argc != 4) {
         cout << "Incorrect Syntax" << endl;
         cout << "    Syntax:  " << argv[0] << " <data_file> <input_file> <output_file>" << endl;
@@ -154,36 +154,36 @@ void write_team(const Team& team, const Restrictions& restrictions,
 }
 
 
-void greedy(const Restrictions& restrictions, VP& all_players,
+void greedy(const Restrictions& restrictions, Players& all_players,
             const string& output_file, const double& start){
 
     // Initialising empty team
-    VVP players = {
-        VP(restrictions.limits[0]),
-        VP(restrictions.limits[1]),
-        VP(restrictions.limits[2]),
-        VP(restrictions.limits[3])
+    PlayersByPosition players = {
+        Players(restrictions.limits[0]),
+        Players(restrictions.limits[1]),
+        Players(restrictions.limits[2]),
+        Players(restrictions.limits[3])
     };
 
     Team team = {0, 0, players};
-    VI size_pos = {0, 0, 0, 0};
+    vector<int> size_pos = {0, 0, 0, 0};
     Player p;
 
-    // Parameters used to sort the players
-    double 
-        c1 = 1,     // exponent of the points of a player
-        c2 = 1.5;   // exponent of the remaining money after using player
+    // Exponent of the points of a player (used in sorting)
+    double c1 = 1;
+    // Exponent of the remaining money after using player (used in sorting)
+    double c2 = 1.5;
     
     // While team is not full, we sort the players and add the first
     // player that satisfies the restrictions, at each iteration
     // the parameters are changed
     for (int total_players = 0; total_players < 11; ++total_players) {
-        // Sorts players in increasing order, check comp class
+        // Sorts players in increasing order, check player_sorter class
         // for exact sorting criteria
         sort(
             all_players.begin(),
             all_players.end(),
-            comp(c1, c2, restrictions.T - team.T, total_players == 10)
+            player_sorter(c1, c2, restrictions.T - team.T, total_players == 10)
         );
 
         // Finds first possible player, until found, removes
@@ -208,7 +208,7 @@ int main(int argc, char** argv) {
 
     double start = time();
     Restrictions restrictions;
-    VP all_players;
+    Players all_players;
     read_input(argc, argv, restrictions, all_players);
     const string output_file = argv[3];
 
